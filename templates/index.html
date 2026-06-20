@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sanskrit → Prakrit Translator</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Playfair+Display:ital,wght@0,700;1,400&family=Lora:ital,wght@0,400;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="header-badge">॥ हेमचन्द्र ॥</div>
+      <h1>Sanskrit → Prakrit Translator</h1>
+      <p class="subtitle">Phonological rules from Hemacandra's <em>Siddhahemaśabdānuśāsana</em> · Adhyāya VIII, Pādas 1–2 · All 489 sūtras</p>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Info banner -->
+  <div class="info-banner">
+    <i class="fas fa-info-circle"></i>
+    Enter a Sanskrit stem in <strong>IAST</strong> (e.g. <code>rāja</code>, <code>dharma</code>, <code>śiva</code>, <code>kṛṣṇa</code>).
+    Type diacritics directly or use a keyboard tool.
+    The translator applies Hemacandra's rules and shows all valid Prakrit forms with the rules applied.
+    Optional/Bahulam rules produce multiple variants.
+  </div>
+
+  <!-- Input card -->
+  <div class="card input-card">
+    <h2><i class="fas fa-language"></i> Enter Sanskrit Word</h2>
+
+    <form id="translateForm" class="translate-form" onsubmit="return submitForm(event)">
+      <div class="form-row">
+        <div class="input-wrapper">
+          <label for="wordInput">Sanskrit Stem <span class="hint">(IAST, no case endings)</span></label>
+          <input
+            type="text"
+            id="wordInput"
+            name="word"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="e.g. rāja, dharma, śiva, karma …"
+            value="{{ query or '' }}"
+          >
+        </div>
+        <button type="submit" class="btn-translate" id="submitBtn">
+          <i class="fas fa-arrow-right"></i> Translate
+        </button>
+      </div>
+
+      <!-- Quick examples -->
+      <div class="quick-examples">
+        <span class="label">Try:</span>
+        {% for ex in ['rāja', 'dharma', 'karma', 'mitra', 'putra', 'deva', 'śiva', 'kṛṣṇa', 'loka', 'hasta', 'satya', 'ākāśa', 'gṛha', 'strī', 'jñāna', 'sūrya', 'nara', 'vāyu', 'agni', 'vṛkṣa'] %}
+        <button type="button" class="chip" onclick="setWord('{{ ex }}')">{{ ex }}</button>
+        {% endfor %}
+      </div>
+
+      <!-- Soften k→g checkbox (revealed when any result form contains k) -->
+      <div class="soften-row" id="softenRow" style="display:none">
+        <label class="soften-label">
+          <input type="checkbox" id="softenCheck" onchange="onSoftenChange()">
+          <span>Soften <code>k → g</code> <span class="hint">(voiced / softened variant)</span></span>
+        </label>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results area -->
+  <div id="resultsArea">
+    {% if result %}
+      {{ render_results(result) }}
+    {% endif %}
+  </div>
+
+</main>
+
+<footer>
+  <div class="container">
+    <p>Based on <strong>Hemacandra's Siddhahemaśabdānuśāsana</strong>, Adhyāya VIII · Pādas 1–2 · 489 sūtras</p>
+    <p>The <em>bahulam</em> principle (8.1.2): rules are licences, not commands — multiple forms are always valid.</p>
+  </div>
+</footer>
+
+<!-- Results template (Jinja macro) -->
+{% macro render_results(r) %}
+<div class="results-wrapper">
+  <!-- Meta info -->
+  <div class="results-meta card">
+    <div class="meta-row">
+      <div class="meta-item">
+        <span class="meta-label">Input</span>
+        <span class="meta-value iast">{{ r.original_input }}</span>
+      </div>
+      <div class="arrow-sep"><i class="fas fa-chevron-right"></i></div>
+      <div class="meta-item">
+        <span class="meta-label">Stem analysed</span>
+        <span class="meta-value iast">{{ r.stem }}</span>
+      </div>
+      {% if r.vibhakti_stripped %}
+      <div class="meta-badge">
+        <i class="fas fa-cut"></i> Stripped ending: <code>-{{ r.vibhakti_stripped }}</code>
+      </div>
+      {% endif %}
+      {% if r.from_exception %}
+      <div class="meta-badge exception-badge">
+        <i class="fas fa-star"></i> Lexical exception
+      </div>
+      {% endif %}
+    </div>
+    <div class="form-count">
+      <strong>{{ r.forms | length }}</strong> Prakrit form{{ 's' if r.forms | length != 1 else '' }} found
+    </div>
+  </div>
+
+  <!-- Forms grid -->
+  {% if r.forms %}
+  <div class="forms-grid">
+    {% for form in r.forms %}
+    <div class="form-card">
+      <div class="prakrit-form">{{ form.prakrit }}</div>
+      {% if form.rules %}
+      <div class="rules-list">
+        {% for rule_id, desc in form.rules %}
+          {% if rule_id and rule_id != 'lexical' and rule_id != desc %}
+          <div class="rule-item">
+            <span class="rule-id">{{ rule_id }}</span>
+            <span class="rule-desc">{{ desc if desc else '' }}</span>
+          </div>
+          {% elif rule_id %}
+          <div class="rule-item">
+            <span class="rule-id {% if rule_id == 'lexical' %}rule-lexical{% endif %}">
+              {{ '⚑ lexical' if rule_id == 'lexical' else rule_id }}
+            </span>
+            <span class="rule-desc">{{ desc }}</span>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="no-rules"><em>No changes — Sanskrit form retained</em></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="no-results card">
+    <i class="fas fa-exclamation-triangle"></i>
+    No Prakrit forms could be generated for <strong>{{ r.stem }}</strong>.
+    Check the IAST spelling and ensure the input is a bare stem.
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+<script>
+  const RULE_DESCRIPTIONS = {
+    '8.1.11':   'Final consonant elided (antyavyañjanasya luk)',
+    '8.1.23':   'Word-final m → ṃ (anusvāra)',
+    '8.1.25':   'Class nasal (ṅ/ñ/ṇ/n) + C → ṃ before consonant',
+    '8.1.37':   'Visarga -aḥ → -o (nom. sg.)',
+    '8.1.84':   'Long vowel shortens before consonant cluster',
+    '8.1.126':  'Vocalic ṛ → a (ṛto\'t)',
+    '8.1.128':  'Vocalic ṛ → i (kṛpā-class, opt.)',
+    '8.1.131':  'Vocalic ṛ → u (ṛtu-class, opt.)',
+    '8.1.148':  'Diphthong ai → e (aita et)',
+    '8.1.159':  'Diphthong au → o (auta ot)',
+    '8.1.177':  'k/g/c/j/t/d/v → ∅ intervocalic (core lenition, bahulam)',
+    '8.1.179+8.1.231': 'p → v or ∅ intervocalic (8.1.179 + 8.1.231)',
+    '8.1.187':  'kh/gh/th/dh/bh → h intervocalic (h-rule)',
+    '8.1.195':  'ṭ → ḍ intervocalic',
+    '8.1.228':  'n → ṇ intervocalic (single, non-initial)',
+    '8.1.229':  'Initial n → ṇ (opt.)',
+    '8.1.231':  'p → v intervocalic (po vaḥ)',
+    '8.1.237':  'b → v intervocalic (bo vaḥ)',
+    '8.1.245':  'Word-initial y → j (āderyo jaḥ)',
+    '8.1.260':  'ś/ṣ → s (universal sibilant merger)',
+    '8.2.3':    'kṣ → kkh (default) or cch (kṣaḥ khaḥ kvacittu cha-jhau)',
+    '8.2.13':   'tya → cca (tyo\'caitye)',
+    '8.2.24':   'dya/yya/rya → jja (dya-yya-ryāṃ jaḥ)',
+    '8.2.26':   'dhya/hya → jjha (sādhvasa-dhya-hyāṃ jhaḥ)',
+    '8.2.34':   'ṣṭa → ṭha → ṭṭha',
+    '8.2.42':   'mna/jña → ṇa → ṇṇa (mna-jñorṇaḥ)',
+    '8.2.45':   'sta → tha → ttha (stasya tho)',
+    '8.2.52':   'ḍma/kma → pp (ḍma-kmoḥ)',
+    '8.2.53':   'spa/ṣpa → pha → ppha',
+    '8.2.61':   'nma → m → mm (nmo maḥ)',
+    '8.2.63':   'rya → ra (opt.; brahmacarya-class)',
+    '8.2.74':   'hma/sma → mha (pakṣma-śma-…-hmāṃ mhaḥ)',
+    '8.2.75':   'sna/ṣṇa/hna → ṇha',
+    '8.2.76':   'hla/hra → lha',
+    '8.1.178':  'r → ∅ intervocalic (bahulam)',
+    '8.1.202':  'ḍ → l intervocalic (bahulam)',
+    '8.1.224':  'j → y intervocalic (bahulam)',
+    '8.1.247':  'y → ∅ intervocalic (bahulam)',
+    '8.1.255':  'l → ∅ intervocalic (bahulam)',
+    '8.1.261':  's → h intervocalic (sibilant aspiration, bahulam)',
+    '8.1.267':  'h → ∅ intervocalic (bahulam)',
+    '8.2.9':    'sth → ṭṭha (sthāna-class)',
+    '8.2.29':   'ny → ñña (palatal nasal assimilation)',
+    '8.2.43-44':'kna/gna → ṇṇa (velar + nasal → retroflex geminate)',
+    '8.2.77-79':'Cluster reduction: upper elision + gemination inline (8.2.77-79 + 8.2.89-93)',
+    'ya-śruti': 'y-glide inserted between hiatus vowels (ya-śruti)',
+    'soften':   'k → g (voiced / softened variant)',
+    'lexical':  'Lexical exception (nipātana)',
+  };
+
+  let _lastResult = null;
+
+  async function doTranslate(word, softenK) {
+    const resp = await fetch('/translate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({word, soften_k: !!softenK}),
+    });
+    return resp.json();
+  }
+
+  async function submitForm(e) {
+    e.preventDefault();
+    const word = document.getElementById('wordInput').value.trim();
+    if (!word) return false;
+
+    const btn = document.getElementById('submitBtn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating…';
+    btn.disabled = true;
+
+    // Reset soften checkbox on new word
+    const softenCheck = document.getElementById('softenCheck');
+    softenCheck.checked = false;
+    document.getElementById('softenRow').style.display = 'none';
+
+    try {
+      const data = await doTranslate(word, false);
+      if (data.error) {
+        showError(data.error);
+      } else {
+        _lastResult = data;
+        renderResults(data);
+        // Show soften row if any form contains k
+        if (data.has_k) {
+          document.getElementById('softenRow').style.display = 'flex';
+        }
+      }
+    } catch (err) {
+      showError('Network error: ' + err.message);
+    } finally {
+      btn.innerHTML = '<i class="fas fa-arrow-right"></i> Translate';
+      btn.disabled = false;
+    }
+    return false;
+  }
+
+  async function onSoftenChange() {
+    const word = document.getElementById('wordInput').value.trim();
+    if (!word) return;
+    const checked = document.getElementById('softenCheck').checked;
+    try {
+      const data = await doTranslate(word, checked);
+      if (!data.error) {
+        _lastResult = data;
+        renderResults(data);
+      }
+    } catch (err) { /* silent */ }
+  }
+
+  function setWord(w) {
+    document.getElementById('wordInput').value = w;
+    document.getElementById('translateForm').dispatchEvent(
+      new Event('submit', {cancelable: true, bubbles: true})
+    );
+  }
+
+  function ruleLabel(ruleId) {
+    return RULE_DESCRIPTIONS[ruleId] || ruleId;
+  }
+
+  function renderResults(r) {
+    const area = document.getElementById('resultsArea');
+    if (!r.forms || r.forms.length === 0) {
+      area.innerHTML = `<div class="no-results card">
+        <i class="fas fa-exclamation-triangle"></i>
+        No Prakrit forms generated for <strong>${escHtml(r.stem)}</strong>.
+      </div>`;
+      return;
+    }
+
+    let metaBadges = '';
+    if (r.vibhakti_stripped) {
+      metaBadges += `<div class="meta-badge"><i class="fas fa-cut"></i> Stripped: <code>-${escHtml(r.vibhakti_stripped)}</code></div>`;
+    }
+    if (r.from_exception) {
+      metaBadges += `<div class="meta-badge exception-badge"><i class="fas fa-star"></i> Lexical exception</div>`;
+    }
+
+    let cardsHtml = '';
+    for (const form of r.forms) {
+      const isSoftened = !!form.softened;
+      let rulesHtml = '';
+      if (form.rules && form.rules.length > 0) {
+        for (const [ruleId, desc] of form.rules) {
+          if (!ruleId) continue;
+          const label = ruleLabel(ruleId);
+          const isLexical = ruleId === 'lexical';
+          const isSoftenRule = ruleId === 'soften';
+          const isYaShruti = ruleId === 'ya-śruti';
+          let badgeClass = '';
+          if (isLexical) badgeClass = 'rule-lexical';
+          else if (isSoftenRule) badgeClass = 'rule-soften';
+          else if (isYaShruti) badgeClass = 'rule-ya';
+          const badgeText = isLexical ? '⚑ lexical' : isYaShruti ? '≈ ya-śruti' : escHtml(ruleId);
+          const extraDesc = desc && desc !== ruleId ? `<span class="rule-note">${escHtml(desc)}</span>` : '';
+          rulesHtml += `
+            <div class="rule-item">
+              <span class="rule-id ${badgeClass}">${badgeText}</span>
+              <span class="rule-desc">${escHtml(label)}${extraDesc}</span>
+            </div>`;
+        }
+      } else {
+        rulesHtml = '<div class="no-rules"><em>Sanskrit form retained — no rules applied</em></div>';
+      }
+
+      const softenBadge = isSoftened
+        ? `<div class="softened-badge"><i class="fas fa-volume-down"></i> softened</div>` : '';
+
+      cardsHtml += `
+        <div class="form-card${isSoftened ? ' form-card-softened' : ''}">
+          <div class="prakrit-form">${escHtml(form.prakrit)}${softenBadge}</div>
+          <div class="rules-list">${rulesHtml}</div>
+        </div>`;
+    }
+
+    const count = r.forms.length;
+    area.innerHTML = `
+      <div class="results-wrapper">
+        <div class="results-meta card">
+          <div class="meta-row">
+            <div class="meta-item">
+              <span class="meta-label">Input</span>
+              <span class="meta-value iast">${escHtml(r.original_input)}</span>
+            </div>
+            <div class="arrow-sep"><i class="fas fa-chevron-right"></i></div>
+            <div class="meta-item">
+              <span class="meta-label">Stem</span>
+              <span class="meta-value iast">${escHtml(r.stem)}</span>
+            </div>
+            ${metaBadges}
+          </div>
+          <div class="form-count">
+            <strong>${count}</strong> Prakrit form${count !== 1 ? 's' : ''} found
+          </div>
+        </div>
+        <div class="forms-grid">${cardsHtml}</div>
+      </div>`;
+
+    area.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+
+  function showError(msg) {
+    document.getElementById('resultsArea').innerHTML = `
+      <div class="no-results card error-card">
+        <i class="fas fa-times-circle"></i> ${escHtml(msg)}
+      </div>`;
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Submit on Enter
+  document.getElementById('wordInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('submitBtn').click();
+    }
+  });
+
+  // Auto-submit if there was a server-side query
+  {% if query %}
+  window.addEventListener('DOMContentLoaded', () => {
+    // Results already rendered server-side
+  });
+  {% endif %}
+</script>
+
+</body>
+</html>
