@@ -450,8 +450,12 @@ def _optional_lenite(forms: List[Form], lenite_set: set,
 
 
 def rule_8_1_178(forms: List[Form]) -> List[Form]:
-    """8.1.178 BAHULAM — Intervocalic single r → ∅ (very common in Maharashtri)."""
-    return _optional_lenite(forms, {'r'}, '8.1.178', 'r → ∅ intervocalic (bahulam)')
+    """8.1.178 — Intervocalic single r is RETAINED in Prakrit.
+
+    The bahulam r → ∅ deletion is not applied: when r stands alone between
+    vowels it does not elide singularly, so this rule is a no-op (kept here to
+    document the sūtra position). Left out of PIPELINE accordingly."""
+    return forms
 
 
 def rule_8_1_224(forms: List[Form]) -> List[Form]:
@@ -997,7 +1001,7 @@ PIPELINE: List[Callable[[List[Form]], List[Form]]] = [
     rule_8_1_224,      # j → y (bahulam)
     rule_8_1_228,      # n → ṇ
     rule_8_1_237,      # b → v
-    rule_8_1_178,      # r → ∅ (bahulam) [8.1.178]
+    # rule_8_1_178 removed: intervocalic single r is retained (no bahulam r → ∅)
     rule_8_1_247,      # y → ∅ (bahulam) [8.1.247]
     rule_8_1_255,      # l → ∅ (bahulam) [8.1.255]
     rule_8_1_261,      # s → h (bahulam) [8.1.261]

@@ -32,6 +32,17 @@ def _apply_pipeline(tokens: List[str]) -> List[Form]:
     return deduplicate(forms)
 
 
+def _is_bahulam(f: Form) -> bool:
+    """A form is bahulam-derived if any rule in its trace is an optional/bahulam rule."""
+    return any('bahulam' in desc.lower() for _, desc in f.rules)
+
+
+def _order_bahulam_last(forms: List[Form]) -> List[Form]:
+    """Stable-sort forms so obligatory-only forms come first and any form
+    produced via a bahulam (optional) rule is kept at the end, in order."""
+    return sorted(forms, key=_is_bahulam)
+
+
 def _soften_k_forms(forms: List[Form]) -> List[Form]:
     """
     For each form containing 'k', produce an additional form with k→g (voicing).
@@ -116,6 +127,7 @@ class SanskritPrakritTranslator:
                 forms = deduplicate(forms)
                 if soften_k:
                     forms = _soften_k_forms(forms)
+                forms = _order_bahulam_last(forms)
                 return TranslationResult(
                     original_input=word,
                     stem=candidate,
@@ -132,6 +144,7 @@ class SanskritPrakritTranslator:
         forms = _apply_pipeline(tokens)
         if soften_k:
             forms = _soften_k_forms(forms)
+        forms = _order_bahulam_last(forms)
         return TranslationResult(
             original_input=word,
             stem=stem,

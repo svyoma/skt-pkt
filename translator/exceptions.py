@@ -155,6 +155,12 @@ EXCEPTIONS: Dict[str, List[Tuple[str, List[str], str]]] = {
     'svapna': [('siviṇa', ['8.2.108'], 'svapna: i-epenthesis → siviṇo form'),
                ('sappaṇa',['8.2.77', '8.2.89'], 'svapna: cluster reduction')],
 
+    # ── 8.2.116 ────────────────────────────────────────────────────────────
+    # Varṇa-viparyaya (metathesis): sporadic r/ṇ transposition in listed words.
+    # Not derivable by the general pipeline, so listed here as nipātana.
+    'kareṇū':   [('kaṇerū',  ['8.2.116'], 'kareṇū → kaṇerū (r/ṇ metathesis)')],
+    'vārāṇasī': [('bāṇārasī', ['8.2.116'], 'vārāṇasī → bāṇārasī (r/ṇ metathesis, v→b)')],
+
     # Particles / indeclinables (Part XI)
     'api':    [('pi',   ['8.1.41'], 'api: a- elided → pi'),
                ('avi',  ['8.1.41'], 'api: opt. a- → avi')],
